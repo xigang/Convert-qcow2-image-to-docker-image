@@ -7,7 +7,7 @@
 ####################
 
 #================
-# Check Permission of current user in $MOUNT_POINT/
+# Check Permission of current user in $MOUNT_PPOINT/
 #================
 function CheckRootPerpermission()  
 {  
@@ -120,7 +120,15 @@ function ConvertToDockerImage()
    echo "qcloud" | sudo rm -rf $namewithoutqcow2
    echo "qcloud" | sudo mkdir $namewithoutqcow2
    echo "partition offset: " $PARTITION_OFFSET
-   echo "qcloud" | sudo mount -o loop,rw,offset=$PARTITION_OFFSET $namewithoutqcow2.raw  $MOUNT_PPOINT/$namewithoutqcow2
+
+   if [ "$PARTITION_OFFSET" == "0"]
+   then
+      offset=1048576
+   else
+      offset=$PARTITION_OFFSET
+   fi
+
+   echo "qcloud" | sudo mount -o loop,rw,offset=$offset $namewithoutqcow2.raw  $MOUNT_PPOINT/$namewithoutqcow2
    echo " mount successfully "
 
    GenerateImage $namewithoutqcow2;
@@ -131,10 +139,10 @@ function ConvertToDockerImage()
 function GenerateImage()
 {
     echo " namewithoutqcow2: $1 "
-    cd $MOUNT_POINT/$1
+    cd $MOUNT_PPOINT/$1
     ls -al
     pwd
-    echo "qcloud" | sudo tar -czf $MOUNT_POINT/$1.tar.gz .
+    echo "qcloud" | sudo tar -czf $MOUNT_PPOINT/$1.tar.gz .
     echo " generate image successfully "
     cd ../
     ls -al
@@ -144,14 +152,14 @@ function GenerateImage()
 function UnmountImage()
 {
     echo " namewithoutqcow2: $1 "
-    echo "qcloud" | sudo umount $MOUNT_POINT/$1
+    echo "qcloud" | sudo umount $MOUNT_PPOINT/$1
     echo "umount successfully "
 }
 
 function UploadToDocker()
 {
     echo " namewithoutqcow2: $1 "
-    echo "qcloud" | cat $MOUNT_POINT/$1.tar.gz | sudo docker import -c "EXPOSE 22" - $1 
+    echo "qcloud" | cat $MOUNT_PPOINT/$1.tar.gz | sudo docker import -c "EXPOSE 22" - $1 
     echo " upload to Docker successfully"
     echo "qcloud" | sudo docker images
     ls -al
