@@ -121,7 +121,7 @@ function ConvertToDockerImage()
    echo "qcloud" | sudo mkdir $namewithoutqcow2
    echo "partition offset: " $PARTITION_OFFSET
 
-   if [ "$PARTITION_OFFSET" == "0"]
+   if [ -z "$PARTITION_OFFSET" ]
    then
       offset=1048576
    else
