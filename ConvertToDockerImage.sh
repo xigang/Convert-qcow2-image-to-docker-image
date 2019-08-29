@@ -2,22 +2,21 @@
 #####################
 #Script Name : Convert devel or release image to docker image
 #Author : golfayi ( golfayi@sina.com)
-#Using Method : ./ConvertToDockerImage.sh -i "Image's URL"
+#Author:  Xigang Wang (wangxigang@gmail.com)
+#Using Method : ./ConvertToDockerImage.sh -i "ImageName"
 ####################
 
 #================
-# Check Permission of current user in /home/image/
+# Check Permission of current user in $MOUNT_POINT/
 #================
 function CheckRootPerpermission()  
 {  
     check_CurrentUser=`whoami`  
     if [ "$check_CurrentUser" == "root" ]  
     then   
-        echo "You are $check_CurrentUser user"  
-        echo "You are a super amdin"  
+        echo "You are $check_CurrentUser user, so is a supper admin."  
     else  
-        echo "You are $check_CurrentUser user"  
-        echo "You are a common user"  
+        echo "You are $check_CurrentUser user, so is a common user."  
     fi  
 }
 
@@ -36,9 +35,7 @@ function CheckImage()
     JudgeImage $shortimagename;
 }
 
-#================
-# Check image exist in /home/image directory
-#================
+
 function CheckImageExist()
 {
     echo " image short name: $1"
@@ -52,23 +49,59 @@ function CheckImageExist()
         echo "Dont have $1 in image folder, continue"
     fi
 }
-function getImageLink()
+
+function CheckQemuImgExist()
+{
+    echo "Check if the qemu-img tool exists."
+    result=$(whereis qemu-img | awk '{print $2}')
+
+    if [[ "$result" != "" ]]
+    then
+      echo "The qemu-img tool exists and is installed in the $result directory."
+    else
+      echo "The qemu-img tool does not exist. Please run the following command to install <yum install qemu-img>"
+    fi
+}
+
+function GetImageName()
 {
     [ $# -eq 0 ] #if no input, print the help info
 
-    while getopts "i:" opts
+    while getopts "i:p:o:h" opts
     do
         case $opts in
             i)
-                IMAGE_LINK=$OPTARG
+                IMAGE_NAME=$OPTARG
+                ;;
+            p)
+                MOUNT_PPOINT=$OPTARG
+                mkdir -p $MOUNT_PPOINT
+                ;;
+            o)
+                PARTITION_OFFSET=$OPTARG
+                ;;
+            h)
+              echo "Usage: ./ConvertToDockerImage.sh -i <image.qcow2> -p <mount-dir>"
+                echo "-i the name of the image(eg: centos.qcow2)"
+                echo "-p mount image to the location of the machine"
+                echo "-o partition offet value for mount use"
+                echo "-h print help info"
                 ;;
             *)
-                echo "unknown argument $OPTARG"
+                echo "unknown arguments: $OPTARG"
                 ;;
         esac
     done
-    echo "wget image :" $IMAGE_LINK
-    echo "btscloud" | sudo wget $IMAGE_LINK
+
+    if [ ! -z "$IMAGE_NAME" ]
+    then
+        echo "IMAGE NAME: " $IMAGE_NAME
+    fi
+
+    if [ ! -z "$MOUNT_PPOINT" ]
+    then
+        echo "IMAGE MOUNT POINT: " $MOUNT_PPOINT
+    fi
 }
 
 
@@ -80,14 +113,14 @@ function ConvertToDockerImage()
    namewithoutqcow2=${shortname%.*}
    echo " namewithoutqcow2 : $namewithoutqcow2"
    ls -al
-   echo "btscloud" | sudo rm -rf $namewithoutqcow2.raw
-   echo "btscloud" | sudo qemu-img convert -f qcow2 -O raw $shortname $namewithoutqcow2.raw
+   echo "qcloud" | sudo rm -rf $namewithoutqcow2.raw
+   echo "qcloud" | sudo qemu-img convert -f qcow2 -O raw $shortname $namewithoutqcow2.raw
    echo " convert successfully "
-   echo "btscloud" | sudo fdisk -lu $namewithoutqcow2.raw
-   echo "btscloud" | sudo rm -rf $namewithoutqcow2
-   echo "btscloud" | sudo mkdir $namewithoutqcow2
-   #MountImage $namewithoutqcow2;
-   echo "btscloud" | sudo mount -o loop,rw,offset=1048576 $namewithoutqcow2.raw  /home/image/$namewithoutqcow2
+   echo "qcloud"  | sudo fdisk -lu $namewithoutqcow2.raw
+   echo "qcloud" | sudo rm -rf $namewithoutqcow2
+   echo "qcloud" | sudo mkdir $namewithoutqcow2
+   echo "partition offset: " $PARTITION_OFFSET
+   echo "qcloud" | sudo mount -o loop,rw,offset=$PARTITION_OFFSET $namewithoutqcow2.raw  $MOUNT_PPOINT/$namewithoutqcow2
    echo " mount successfully "
 
    GenerateImage $namewithoutqcow2;
@@ -98,10 +131,10 @@ function ConvertToDockerImage()
 function GenerateImage()
 {
     echo " namewithoutqcow2: $1 "
-    cd /home/image/$1
+    cd $MOUNT_POINT/$1
     ls -al
     pwd
-    echo "btscloud" | sudo tar -czf /home/image/$1.tar.gz .
+    echo "qcloud" | sudo tar -czf $MOUNT_POINT/$1.tar.gz .
     echo " generate image successfully "
     cd ../
     ls -al
@@ -111,24 +144,29 @@ function GenerateImage()
 function UnmountImage()
 {
     echo " namewithoutqcow2: $1 "
-    echo "btscloud" | sudo umount /home/image/$1
+    echo "qcloud" | sudo umount $MOUNT_POINT/$1
     echo "umount successfully "
 }
 
 function UploadToDocker()
 {
     echo " namewithoutqcow2: $1 "
-    echo "btscloud" | cat /home/image/$1.tar.gz | sudo docker import -c "EXPOSE 22" - $1 
+    echo "qcloud" | cat $MOUNT_POINT/$1.tar.gz | sudo docker import -c "EXPOSE 22" - $1 
     echo " upload to Docker successfully"
-    echo "btscloud" | sudo docker images
+    echo "qcloud" | sudo docker images
     ls -al
-    echo "btscloud" | sudo rm -rf *.gz
-    echo "btscloud" | sudo rm -rf *.raw
+    echo "qcloud" | sudo rm -rf *.gz
+    echo "qcloud" | sudo rm -rf *.raw
     pwd
     ls -al
 }
 
-CheckRootPerpermission
-getImageLink $@
-ConvertToDockerImage $IMAGE_LINK
 
+# script entry.
+CheckRootPerpermission
+GetImageName $@
+
+if [ ! -z "$IMAGE_NAME" ]
+then 
+  ConvertToDockerImage $IMAGE_NAME
+fi
